@@ -24,7 +24,7 @@ def train(is_vocab=False):
 	num_tags = len(tag2id)
 	# sge = [GRU,LSTM,IndRNN,F-LSTM]
 	model = TransformerCRFModel(vocab_size, num_tags, is_training=True, seg='GRU')
-	# model = BiRnnCRF(vocab_size, num_tags, seg='rnn')
+	# model = BiRnnCRF(vocab_size, num_tags, seg='GRU')
 	sv = tf.train.Supervisor(graph=model.graph, logdir=logdir, save_model_secs=0)
 	with sv.managed_session() as sess:
 		for epoch in range(1, hp.num_epochs + 1):

@@ -24,8 +24,9 @@ class TransformerCRFModel(object):
 			# layers embedding multi_head_attention rnn
 			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True,
 								scope="enc_embed")
-			outputs = self.encoder(outputs)
 			outputs = self.rnn_layer(outputs, seg)
+			outputs = self.encoder(outputs)
+			
 			self.logits = self.logits_layer(outputs)
 			self.loss, self.transition = self.crf_layer()
 			self.train_op = self.optimize()
