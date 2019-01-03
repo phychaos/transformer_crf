@@ -22,19 +22,19 @@ class TransformerCRFModel(object):
 			self.global_step = tf.train.create_global_step()
 			
 			# layers embedding multi_head_attention rnn
-			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True,
-								scope="enc_embed")
-			outputs = self.rnn_layer(outputs, seg)
-			outputs = self.encoder(outputs)
+			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
 			
+			outputs = self.encoder(outputs)
+			outputs = self.cnn_layer(outputs)
+			outputs = self.rnn_layer(outputs, seg)
 			self.logits = self.logits_layer(outputs)
 			self.loss, self.transition = self.crf_layer()
 			self.train_op = self.optimize()
 	
-	def rnn_layer(self, embed, seg):
+	def rnn_layer(self, inputs, seg):
 		"""
 		创建双向RNN层
-		:param embed:
+		:param inputs:
 		:param seg: LSTM GRU F-LSTM, IndRNN
 		:return:
 		"""
@@ -55,11 +55,28 @@ class TransformerCRFModel(object):
 			fw_lstm = tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units)
 			bw_lstm = tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units)
 		# 双向rnn
-		(fw_output, bw_output), _ = tf.nn.bidirectional_dynamic_rnn(fw_lstm, bw_lstm, embed,
+		(fw_output, bw_output), _ = tf.nn.bidirectional_dynamic_rnn(fw_lstm, bw_lstm, inputs,
 																	sequence_length=self.seq_lens,
 																	dtype=tf.float32)
 		# 合并双向rnn的output batch_size * max_seq * (hidden_dim*2)
 		outputs = tf.add(fw_output, bw_output)
+		return outputs
+	
+	@staticmethod
+	def cnn_layer(inputs):
+		inputs = tf.expand_dims(inputs, axis=-1)
+		outputs = []
+		channel = hp.num_units // len(hp.filters)
+		for ii, width in enumerate(hp.filters):
+			with tf.variable_scope("cnn_{}_layer".format(ii)):
+				weight = tf.Variable(tf.truncated_normal([width, hp.num_units, 1, channel], stddev=0.1, name='w'))
+				bias = tf.get_variable('bias', [channel], initializer=tf.constant_initializer(0.0))
+				output = tf.nn.conv2d(inputs, weight, strides=[1, 1, hp.num_units, 1], padding='SAME')
+				output = tf.nn.bias_add(output, bias, data_format="NHWC")
+				output = tf.nn.relu(output)
+				output = tf.reshape(output, shape=[-1, hp.max_len, channel])
+				outputs.append(output)
+		outputs = tf.concat(outputs, axis=-1)
 		return outputs
 	
 	def encoder(self, embed):

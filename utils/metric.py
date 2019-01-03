@@ -5,23 +5,19 @@
 # @File    : metric.py
 
 
-def recover_label(pre_tags, gold_tags, seq_lens, id2tag):
+def recover_label(tags, seq_lens, id2tag):
 	"""
 	恢复标签 ID->tag
-	:param pre_tags:
-	:param gold_tags:
+	:param tags:
+	:param seq_lens:
 	:param id2tag:
 	:return:
 	"""
-	
-	pre_label = []
-	gold_label = []
-	for pre_tag, gold_tag, seq_len in zip(pre_tags, gold_tags, seq_lens):
-		pre = [id2tag.get(str(_id), 'O') for _id in pre_tag[:seq_len]]
-		gold = [id2tag.get(str(_id), 'O') for _id in gold_tag[:seq_len]]
-		pre_label.append(pre)
-		gold_label.append(gold)
-	return pre_label, gold_label
+	labels = []
+	for tag, seq_len in zip(tags, seq_lens):
+		pre = [id2tag.get(str(_id), 'O') for _id in tag[:seq_len]]
+		labels.append(pre)
+	return labels
 
 
 def get_ner_fmeasure(golden_lists, predict_lists, label_type="BMES"):

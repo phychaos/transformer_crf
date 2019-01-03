@@ -18,6 +18,7 @@ class HyperParams:
 	num_blocks = 6  # number of encoder/decoder blocks
 	num_epochs = 60
 	num_heads = 8
+	filters = [2, 3, 4, 5]
 	clip = 5
 	dropout_rate = 0.1
 	sinusoid = False  # If True, use sinusoid. If false, positional embedding.
