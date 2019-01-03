@@ -25,7 +25,7 @@ class TransformerCRFModel(object):
 			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
 			
 			outputs = self.encoder(outputs)
-			outputs = self.cnn_layer(outputs)
+			# outputs = self.cnn_layer(outputs)
 			outputs = self.rnn_layer(outputs, seg)
 			self.logits = self.logits_layer(outputs)
 			self.loss, self.transition = self.crf_layer()

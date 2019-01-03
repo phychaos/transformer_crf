@@ -171,7 +171,7 @@ def generate_data(filename, word2id, tag2id, max_len=50):
 			seq_lens.append(seq_len)
 			sentences.append(sentence)
 			source_sentences.append(_sentence)
-	default = tag2id['O']
+	default = 0
 	for _tag, seq_len in zip(_tags, _seq_lens):
 		tag = [tag2id.get(label, default) for label in _tag]
 		if seq_len <= max_len:
