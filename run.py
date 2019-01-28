@@ -16,9 +16,9 @@ import numpy as np
 
 
 def train(is_vocab=False):
-	seg = 'GRU'  # seg = [GRU,LSTM,IndRNN,F-LSTM]
+	seg = 'LSTM'  # seg = [GRU,LSTM,IndRNN,F-LSTM]
 	if is_vocab:
-		create_vocab()
+		create_vocab(TRAIN_DATA)
 	word2id, id2word = load_data(TOKEN_DATA)
 	tag2id, id2tag = load_data(TAG_DATA)
 	x_train, y_train, seq_lens, _, _ = generate_data(TRAIN_DATA, word2id, tag2id, max_len=hp.max_len)
@@ -58,23 +58,25 @@ def train(is_vocab=False):
 			print('epoch:\t{}\ttrain loss:\t{}\tdev loss:\t{}'.format(epoch, train_loss_v, dev_loss_v))
 			print('acc:\t{}\tp:\t{}\tr:\t{}\tf:\t{}'.format(acc, p, r, f))
 			print('****************************************************\n\n')
-			# gs = sess.run(model.global_step)
-			# sv.saver.save(sess, logdir + '/model_epoch_{}_{}'.format(epoch, gs))
+		# gs = sess.run(model.global_step)
+		# sv.saver.save(sess, logdir + '/model_epoch_{}_{}'.format(epoch, gs))
 
 
-def train_crf():
+def train_crf(is_vocab=False):
+	if is_vocab:
+		create_vocab(TRAIN_DATA)
 	word2id, id2word = load_data(TOKEN_DATA)
 	tag2id, id2tag = load_data(TAG_DATA)
 	_, _, train_, x_train, y_train = generate_data(TRAIN_DATA, word2id, tag2id, max_len=hp.max_len)
 	_, _, dev_seq_lens, x_dev, y_dev = generate_data(DEV_DATA, word2id, tag2id, max_len=hp.max_len)
 	model_file = "logdir/model_crf"
 	model = CRF()
-	model.fit(x_train, y_train, template_file='model/module/templates.txt', model_file=model_file, max_iter=60)
+	model.fit(x_train, y_train, template_file='model/module/templates.txt', model_file=model_file, max_iter=20)
 	pre_seq = model.predict(x_dev, model_file=model_file)
 	acc, p, r, f = get_ner_fmeasure(y_dev, pre_seq)
 	print('acc:\t{}\tp:\t{}\tr:\t{}\tf:\t{}\n'.format(acc, p, r, f))
 
 
 if __name__ == "__main__":
-	train(is_vocab=False)
-	# train_crf()
+	train(is_vocab=True)
+# train_crf(is_vocab=False)

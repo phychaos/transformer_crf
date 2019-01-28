@@ -16,7 +16,7 @@ class HyperParams:
 	min_cnt = 20  # words whose occurred less than min_cnt are encoded as <UNK>.
 	num_units = 512  # alias = C
 	num_blocks = 6  # number of encoder/decoder blocks
-	num_epochs = 60
+	num_epochs = 30
 	num_heads = 8
 	filters = [2, 3, 4, 5]
 	clip = 5

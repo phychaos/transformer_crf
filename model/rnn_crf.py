@@ -18,6 +18,7 @@ class BiRnnCRF(object):
 			self.x = tf.placeholder(dtype=tf.int32, shape=[None, hp.max_len])
 			self.y = tf.placeholder(dtype=tf.int32, shape=[None, hp.max_len])
 			self.seq_lens = tf.placeholder(dtype=tf.int32, shape=[None])
+			self.dropout_keep_prob = tf.placeholder(tf.float32, name="keep_prob")
 			self.global_step = tf.train.create_global_step()
 			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
 			

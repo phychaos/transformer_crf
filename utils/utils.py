@@ -14,12 +14,12 @@ import numpy as np
 UNK = '<unk>'
 
 
-def create_vocab():
+def create_vocab(filename):
 	"""
 	创建词库
 	:return:
 	"""
-	sentences, tags, _ = read_data(TRAIN_DATA)
+	sentences, tags, _ = read_data(filename)
 	token = merge_list(sentences)
 	tags = merge_list(tags)
 	counter = [(UNK, 100000)] + Counter(token).most_common()

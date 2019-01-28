@@ -7,7 +7,9 @@
 import os
 
 PATH = os.getcwd()
+# TRAIN_DATA = os.path.join(PATH, 'data/model_zhusu_ZZ')
 TRAIN_DATA = os.path.join(PATH, 'data/train.char.bmes')
+# DEV_DATA = os.path.join(PATH, 'data/dev.data')
 DEV_DATA = os.path.join(PATH, 'data/dev.char.bmes')
 TEST_DATA = os.path.join(PATH, 'data/test.char.bmes')
 

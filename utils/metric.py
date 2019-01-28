@@ -71,9 +71,9 @@ def reverse_style(input_string):
 
 def get_ner_BMES(label_list):
 	list_len = len(label_list)
-	begin_label = 'B-'
-	end_label = 'E-'
-	single_label = 'S-'
+	begin_label = 'B'
+	end_label = 'E'
+	single_label = 'S'
 	whole_tag = ''
 	index_tag = ''
 	tag_list = []
@@ -81,16 +81,17 @@ def get_ner_BMES(label_list):
 	for i in range(list_len):
 		# wordlabel = word_list[i]
 		current_label = label_list[i].upper()
+		tags = current_label.split('-')
 		if begin_label in current_label:
 			if index_tag != '':
 				tag_list.append(whole_tag + ',' + str(i - 1))
-			whole_tag = current_label.replace(begin_label, "", 1) + '[' + str(i)
-			index_tag = current_label.replace(begin_label, "", 1)
+			whole_tag = tags[-1] + '[' + str(i)
+			index_tag = tags[-1]
 		
 		elif single_label in current_label:
 			if index_tag != '':
 				tag_list.append(whole_tag + ',' + str(i - 1))
-			whole_tag = current_label.replace(single_label, "", 1) + '[' + str(i)
+			whole_tag = tags[-1] + '[' + str(i)
 			tag_list.append(whole_tag)
 			whole_tag = ""
 			index_tag = ""
