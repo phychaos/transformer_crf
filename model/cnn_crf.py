@@ -1,46 +1,47 @@
 #!/usr/bin python3
 # -*- coding: utf-8 -*-
-# @Time    : 18-12-26 下午5:49
+# @Time    : 18-12-28 上午10:20
 # @Author  : 林利芳
-# @File    : transformer_crf.py
+# @File    : rnn_crf.py
 import tensorflow as tf
 from config.hyperparams import HyperParams as hp
-from model.module.modules import *
+from model.module.modules import embedding
 from model.module.rnn import ForgetLSTMCell, IndRNNCell
 
 
-class TransformerCRFModel(object):
-	def __init__(self, vocab_size, num_tags, is_training=True):
+class CnnCRF(object):
+	def __init__(self, vocab_size, num_tags):
 		self.vocab_size = vocab_size
 		self.num_tags = num_tags
-		self.is_training = is_training
 		self.graph = tf.Graph()
 		with self.graph.as_default():
-			self.x = tf.placeholder(tf.int32, shape=(None, hp.max_len))
-			self.y = tf.placeholder(tf.int32, shape=(None, hp.max_len))
+			self.x = tf.placeholder(dtype=tf.int32, shape=[None, hp.max_len])
+			self.y = tf.placeholder(dtype=tf.int32, shape=[None, hp.max_len])
 			self.seq_lens = tf.placeholder(dtype=tf.int32, shape=[None])
+			self.dropout_keep_prob = tf.placeholder(tf.float32, name="keep_prob")
 			self.global_step = tf.train.create_global_step()
-			
-			# layers embedding multi_head_attention rnn
 			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
 			
-			outputs = self.encoder(outputs)
-			# outputs = self.cnn_layer(outputs)
-			outputs = self.rnn_layer(outputs)
+			# cnn rnn 层
+			outputs = self.cnn_layer(outputs, layer=1)
+			outputs = self.cnn_layer(outputs, layer=2)
+			outputs = self.cnn_layer(outputs, layer=3)
 			self.logits = self.logits_layer(outputs)
+			# crf 层
 			self.loss, self.transition = self.crf_layer()
+			# 优化器
 			self.train_op = self.optimize()
 	
 	def rnn_layer(self, inputs, seg=hp.seg):
 		"""
 		创建双向RNN层
-		:param inputs:
+		:param inputs: 输入
 		:param seg: LSTM GRU F-LSTM, IndRNN
 		:return:
 		"""
 		if seg == 'LSTM':
-			fw_lstm = tf.nn.rnn_cell.BasicLSTMCell(num_units=hp.num_units)
-			bw_lstm = tf.nn.rnn_cell.BasicLSTMCell(num_units=hp.num_units)
+			fw_lstm = tf.nn.rnn_cell.LSTMCell(num_units=hp.num_units)
+			bw_lstm = tf.nn.rnn_cell.LSTMCell(num_units=hp.num_units)
 		
 		elif seg == 'GRU':
 			fw_lstm = tf.nn.rnn_cell.GRUCell(num_units=hp.num_units)
@@ -63,15 +64,16 @@ class TransformerCRFModel(object):
 		return outputs
 	
 	@staticmethod
-	def cnn_layer(inputs):
+	def cnn_layer(inputs, layer=1):
+		inputs_size = inputs.get_shape().as_list()
 		inputs = tf.expand_dims(inputs, axis=-1)
 		outputs = []
-		channel = hp.num_units // len(hp.filters)
+		channel = inputs_size[-1] // len(hp.filters)
 		for ii, width in enumerate(hp.filters):
-			with tf.variable_scope("cnn_{}_layer".format(ii)):
-				weight = tf.Variable(tf.truncated_normal([width, hp.num_units, 1, channel], stddev=0.1, name='w'))
+			with tf.variable_scope("cnn_{}_{}_layer".format(layer, ii + 1)):
+				weight = tf.Variable(tf.truncated_normal([width, inputs_size[-1], 1, channel], stddev=0.1, name='w'))
 				bias = tf.get_variable('bias', [channel], initializer=tf.constant_initializer(0.0))
-				output = tf.nn.conv2d(inputs, weight, strides=[1, 1, hp.num_units, 1], padding='SAME')
+				output = tf.nn.conv2d(inputs, weight, strides=[1, 1, inputs_size[-1], 1], padding='SAME')
 				output = tf.nn.bias_add(output, bias, data_format="NHWC")
 				output = tf.nn.relu(output)
 				output = tf.reshape(output, shape=[-1, hp.max_len, channel])
@@ -79,62 +81,9 @@ class TransformerCRFModel(object):
 		outputs = tf.concat(outputs, axis=-1)
 		return outputs
 	
-	def encoder(self, embed):
-		with tf.variable_scope("Transformer_Encoder"):
-			# Positional Encoding
-			embed += positional_encoding(self.x, num_units=hp.num_units, zero_pad=False, scale=False, scope="enc_pe")
-			# Dropout
-			embed = tf.layers.dropout(embed, rate=hp.dropout_rate, training=tf.convert_to_tensor(self.is_training))
-			output = self.multi_head_block(embed, embed)
-			return output
-	
-	def decoder(self, enc):
-		"""
-		解码层
-		:param enc:
-		:return:
-		"""
-		with tf.variable_scope("Transformer_Decoder"):
-			# Embedding
-			dec = embedding(self.y, vocab_size=self.num_tags, num_units=hp.num_units, scale=True, scope="dec_embed")
-			
-			# Positional Encoding
-			dec += positional_encoding(self.y, num_units=hp.num_units, zero_pad=False, scale=False, scope="dec_pe")
-			# Dropout
-			dec = tf.layers.dropout(dec, rate=hp.dropout_rate, training=tf.convert_to_tensor(self.is_training))
-			
-			output = self.multi_head_block(dec, enc, decoding=True, causality=True)
-			return output
-	
-	def multi_head_block(self, query, key, decoding=False, causality=False):
-		"""
-		多头注意力机制
-		:param query:
-		:param key:
-		:param decoding:
-		:param causality:
-		:return:
-		"""
-		for i in range(hp.num_blocks):
-			with tf.variable_scope("num_blocks_{}".format(i)):
-				# multi head Attention ( self-attention)
-				query = multihead_attention(
-					queries=query, keys=key, num_units=hp.num_units, num_heads=hp.num_heads,
-					dropout_rate=hp.dropout_rate, is_training=self.is_training, causality=causality,
-					scope="self_attention")
-				if decoding:
-					# multi head Attention ( vanilla attention)
-					query = multihead_attention(
-						queries=query, keys=key, num_units=hp.num_units, num_heads=hp.num_heads,
-						dropout_rate=hp.dropout_rate, is_training=self.is_training, causality=False,
-						scope="vanilla_attention")
-				# Feed Forward
-				query = feedforward(query, num_units=[4 * hp.num_units, hp.num_units])
-		return query
-	
 	def logits_layer(self, outputs):
 		"""
-		logits
+		loggits
 		:param outputs:
 		:return:
 		"""

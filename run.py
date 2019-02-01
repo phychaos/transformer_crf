@@ -6,6 +6,8 @@
 from config.config import *
 from model.transformer_crf import TransformerCRFModel
 from model.rnn_crf import BiRnnCRF
+from model.cnn_crf import CnnCRF
+from model.match_pyramid_crf import MatchPyramidCRF
 from model.crf import CRF
 from utils.metric import get_ner_fmeasure, recover_label
 from utils.utils import create_vocab, load_data, generate_data, batch_data, output_file
@@ -15,20 +17,24 @@ import tensorflow as tf
 import numpy as np
 
 
-def train(is_vocab=False):
+def train(network='rnn'):
 	seg = 'LSTM'  # seg = [GRU,LSTM,IndRNN,F-LSTM]
-	if is_vocab:
-		create_vocab(TRAIN_DATA)
 	word2id, id2word = load_data(TOKEN_DATA)
 	tag2id, id2tag = load_data(TAG_DATA)
 	x_train, y_train, seq_lens, _, _ = generate_data(TRAIN_DATA, word2id, tag2id, max_len=hp.max_len)
 	x_dev, y_dev, dev_seq_lens, _, source_tag = generate_data(DEV_DATA, word2id, tag2id, max_len=hp.max_len)
-	# exit()
 	vocab_size = len(word2id)
 	num_tags = len(tag2id)
-	
-	model = TransformerCRFModel(vocab_size, num_tags, is_training=True, seg=seg)
-	# model = BiRnnCRF(vocab_size, num_tags, seg=seg)
+	if network == "transformer":
+		model = TransformerCRFModel(vocab_size, num_tags, is_training=True)
+	elif network == 'rnn':
+		model = BiRnnCRF(vocab_size, num_tags)
+	elif network == 'cnn':
+		model = CnnCRF(vocab_size, num_tags)
+	elif network == 'match-pyramid':
+		model = CnnCRF(vocab_size, num_tags)
+	else:
+		return
 	sv = tf.train.Supervisor(graph=model.graph, logdir=logdir, save_model_secs=0)
 	with sv.managed_session() as sess:
 		for epoch in range(1, hp.num_epochs + 1):
@@ -58,13 +64,10 @@ def train(is_vocab=False):
 			print('epoch:\t{}\ttrain loss:\t{}\tdev loss:\t{}'.format(epoch, train_loss_v, dev_loss_v))
 			print('acc:\t{}\tp:\t{}\tr:\t{}\tf:\t{}'.format(acc, p, r, f))
 			print('****************************************************\n\n')
-		# gs = sess.run(model.global_step)
-		# sv.saver.save(sess, logdir + '/model_epoch_{}_{}'.format(epoch, gs))
 
 
-def train_crf(is_vocab=False):
-	if is_vocab:
-		create_vocab(TRAIN_DATA)
+
+def train_crf():
 	word2id, id2word = load_data(TOKEN_DATA)
 	tag2id, id2tag = load_data(TAG_DATA)
 	_, _, train_, x_train, y_train = generate_data(TRAIN_DATA, word2id, tag2id, max_len=hp.max_len)
@@ -78,5 +81,6 @@ def train_crf(is_vocab=False):
 
 
 if __name__ == "__main__":
-	train(is_vocab=True)
+	create_vocab(TRAIN_DATA)
+	train(network="match-pyramid")
 # train_crf(is_vocab=False)

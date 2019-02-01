@@ -6,10 +6,9 @@
 import tensorflow as tf
 from config.hyperparams import HyperParams as hp
 from model.module.modules import embedding
-from model.module.rnn import ForgetLSTMCell, IndRNNCell
 
 
-class BiRnnCRF(object):
+class MatchPyramidCRF(object):
 	def __init__(self, vocab_size, num_tags):
 		self.vocab_size = vocab_size
 		self.num_tags = num_tags
@@ -23,14 +22,36 @@ class BiRnnCRF(object):
 			outputs = embedding(self.x, vocab_size=self.vocab_size, num_units=hp.num_units, scale=True, scope="embed")
 			
 			# cnn rnn 层
-			
-			outputs = self.rnn_layer(outputs)
+			outputs = self.match_text(outputs, outputs)
 			outputs = self.cnn_layer(outputs)
+			outputs = self.cnn_layer(outputs, layer=2)
 			self.logits = self.logits_layer(outputs)
 			# crf 层
 			self.loss, self.transition = self.crf_layer()
 			# 优化器
 			self.train_op = self.optimize()
+	
+	@staticmethod
+	def match_text(left_embed, right_embed):
+		"""
+		文本匹配 cosine dot binary
+		:param left_embed: 词嵌入 batch * T * D
+		:param right_embed: 词嵌入 batch * T * D
+		:return:
+		"""
+		with tf.variable_scope("match-text"):
+			dot_output = tf.matmul(left_embed, tf.transpose(right_embed, [0, 2, 1]))  # batch * T * T
+		# left_norm = tf.sqrt(tf.matmul(left_embed, tf.transpose(left_embed, [0, 2, 1])) + hp.eps)
+		# right_norm = tf.sqrt(tf.matmul(right_embed, tf.transpose(right_embed, [0, 2, 1])) + hp.eps)
+		# cosine_outputs = tf.div(dot_output, left_norm * right_norm)
+		# binary_outputs = tf.cast(tf.equal(cosine_outputs, 1), tf.float32)
+		# dot_output = tf.expand_dims(dot_output, axis=-1)
+		# cosine_outputs = tf.expand_dims(cosine_outputs, axis=-1)
+		# binary_outputs = tf.expand_dims(binary_outputs, axis=-1)
+		#
+		# outputs = tf.concat([dot_output, cosine_outputs, binary_outputs], axis=-1)
+		print(dot_output.get_shape().as_list())
+		return dot_output
 	
 	def rnn_layer(self, inputs, seg=hp.seg):
 		"""
@@ -46,12 +67,6 @@ class BiRnnCRF(object):
 		elif seg == 'GRU':
 			fw_cell = [tf.nn.rnn_cell.GRUCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
 			bw_cell = [tf.nn.rnn_cell.GRUCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
-		elif seg == 'F-LSTM':
-			fw_cell = [ForgetLSTMCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
-			bw_cell = [ForgetLSTMCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
-		elif seg == 'IndRNN':
-			fw_cell = [IndRNNCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
-			bw_cell = [IndRNNCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
 		else:
 			fw_cell = [tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
 			bw_cell = [tf.nn.rnn_cell.BasicRNNCell(num_units=hp.num_units) for _ in range(hp.num_layer)]
@@ -66,15 +81,16 @@ class BiRnnCRF(object):
 		return outputs
 	
 	@staticmethod
-	def cnn_layer(inputs):
+	def cnn_layer(inputs, layer=1):
+		inputs_size = inputs.get_shape().as_list()
 		inputs = tf.expand_dims(inputs, axis=-1)
 		outputs = []
-		channel = hp.num_units // len(hp.filters)
+		channel = inputs_size[-1]
 		for ii, width in enumerate(hp.filters):
-			with tf.variable_scope("cnn_{}_layer".format(ii)):
-				weight = tf.Variable(tf.truncated_normal([width, hp.num_units, 1, channel], stddev=0.1, name='w'))
+			with tf.variable_scope("cnn_{}_{}_layer".format(layer, ii + 1)):
+				weight = tf.Variable(tf.truncated_normal([width, inputs_size[-1], 1, channel], stddev=0.1, name='w'))
 				bias = tf.get_variable('bias', [channel], initializer=tf.constant_initializer(0.0))
-				output = tf.nn.conv2d(inputs, weight, strides=[1, 1, hp.num_units, 1], padding='SAME')
+				output = tf.nn.conv2d(inputs, weight, strides=[1, 1, inputs_size[-1], 1], padding='SAME')
 				output = tf.nn.bias_add(output, bias, data_format="NHWC")
 				output = tf.nn.relu(output)
 				output = tf.reshape(output, shape=[-1, hp.max_len, channel])
@@ -88,10 +104,11 @@ class BiRnnCRF(object):
 		:param outputs:
 		:return:
 		"""
-		w = tf.get_variable(name='w', dtype=tf.float32, shape=[hp.num_units, self.num_tags])
+		outputs_size = outputs.get_shape().as_list()[-1]
+		w = tf.get_variable(name='w', dtype=tf.float32, shape=[outputs_size, self.num_tags])
 		b = tf.get_variable(name='b', dtype=tf.float32, shape=[self.num_tags])
 		
-		outputs = tf.reshape(outputs, [-1, hp.num_units])
+		outputs = tf.reshape(outputs, [-1, outputs_size])
 		logits = tf.matmul(outputs, w) + b
 		logits = tf.reshape(logits, [-1, hp.max_len, self.num_tags])
 		return logits
