@@ -8,6 +8,7 @@ from model.transformer_crf import TransformerCRFModel
 from model.rnn_crf import BiRnnCRF
 from model.cnn_crf import CnnCRF
 from model.match_pyramid_crf import MatchPyramidCRF
+from model.hmm import HMM
 from model.crf import CRF
 from utils.metric import get_ner_fmeasure, recover_label
 from utils.utils import create_vocab, load_data, generate_data, batch_data, output_file
@@ -18,7 +19,6 @@ import numpy as np
 
 
 def train(network='rnn'):
-	seg = 'LSTM'  # seg = [GRU,LSTM,IndRNN,F-LSTM]
 	word2id, id2word = load_data(TOKEN_DATA)
 	tag2id, id2tag = load_data(TAG_DATA)
 	x_train, y_train, seq_lens, _, _ = generate_data(TRAIN_DATA, word2id, tag2id, max_len=hp.max_len)
@@ -66,7 +66,6 @@ def train(network='rnn'):
 			print('****************************************************\n\n')
 
 
-
 def train_crf():
 	word2id, id2word = load_data(TOKEN_DATA)
 	tag2id, id2tag = load_data(TAG_DATA)
@@ -80,7 +79,21 @@ def train_crf():
 	print('acc:\t{}\tp:\t{}\tr:\t{}\tf:\t{}\n'.format(acc, p, r, f))
 
 
+def train_hmm():
+	word2id, id2word = load_data(TOKEN_DATA)
+	tag2id, id2tag = load_data(TAG_DATA)
+	_, _, train_, x_train, y_train = generate_data(TRAIN_DATA, word2id, tag2id, max_len=hp.max_len)
+	_, _, dev_seq_lens, x_dev, y_dev = generate_data(DEV_DATA, word2id, tag2id, max_len=hp.max_len)
+	model_file = "logdir/model_hmm"
+	model = HMM()
+
+	model.fit(x_train, y_train, model_file=model_file)
+	pre_seq = model.predict(x_dev, model_file=model_file)
+	acc, p, r, f = get_ner_fmeasure(y_dev, pre_seq)
+	print('acc:\t{}\tp:\t{}\tr:\t{}\tf:\t{}\n'.format(acc, p, r, f))
+
+
 if __name__ == "__main__":
-	create_vocab(TRAIN_DATA)
-	train(network="match-pyramid")
-# train_crf(is_vocab=False)
+	# create_vocab(TRAIN_DATA)
+	# train(network="match-pyramid")
+	train_hmm()

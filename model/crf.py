@@ -104,7 +104,7 @@ class CRF(object):
 					at = max_alpha[loc_id - 1][:, np.newaxis] + matrix
 					max_alpha[loc_id] = at.max(axis=0)
 					max_index.append(at.argmax(axis=0))  # 索引代表前一时刻和当前时刻求和的最大值
-			# 最终状态 取概率最大一个最为最终序列结果
+			# 最终状态 取概率最大一个最大最终序列结果
 			max_state = []
 			ty = max_alpha[-1].argmax()
 			max_state.append(y2label.get(ty, 'O'))
